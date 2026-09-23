@@ -7,13 +7,42 @@
 const firebaseConfig={apiKey:"AIzaSyCvtDHMW-Uz_OYDX80EMP4hFPnXQ1CqRms",authDomain:"xiaole-advisor.firebaseapp.com",projectId:"xiaole-advisor",storageBucket:"xiaole-advisor.firebasestorage.app",messagingSenderId:"320682542237",appId:"1:320682542237:web:22b16a4be2f27eb7620074"};
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(), cloud=firebase.firestore();
-const DB='xiaole-advisor-v01',STORE='messages';let db,tab='chat',user=null,syncing=false;
-function openDB(){return new Promise((ok,no)=>{let r=indexedDB.open(DB,1);r.onupgradeneeded=e=>{let d=e.target.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:'id',autoIncrement:true})};r.onsuccess=e=>ok(e.target.result);r.onerror=no})}
-function tx(mode='readonly'){return db.transaction(STORE,mode).objectStore(STORE)}
-function allMessages(){return new Promise(ok=>{let r=tx().getAll();r.onsuccess=()=>ok(r.result||[])})}
-function addMessage(m){return new Promise(ok=>{let r=tx('readwrite').add(m);r.onsuccess=()=>ok(r.result)})}
-function putMessage(m){return new Promise(ok=>{let r=tx('readwrite').put(m);r.onsuccess=()=>ok(r.result)})}
-function clearMessages(){return new Promise(ok=>{let r=tx('readwrite').clear();r.onsuccess=ok})}
+const DB='xiaole-advisor-v01',STORE='messages';let db=null,dbPromise=null,tab='chat',user=null,syncing=false;
+function openDB(){
+  if(db) return Promise.resolve(db);
+  if(dbPromise) return dbPromise;
+  dbPromise=new Promise((ok,no)=>{
+    const r=indexedDB.open(DB,1);
+    r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:'id',autoIncrement:true})};
+    r.onsuccess=e=>{db=e.target.result;db.onclose=()=>{db=null;dbPromise=null};db.onversionchange=()=>{try{db.close()}catch(_){ }db=null;dbPromise=null};ok(db)};
+    r.onerror=()=>{dbPromise=null;no(r.error)};
+    r.onblocked=()=>{dbPromise=null;no(new Error('本機資料庫暫時被其他頁面占用，請關閉其他小樂理專分頁後再試。'))};
+  });
+  return dbPromise;
+}
+async function idbRequest(mode,action,retry=true){
+  try{
+    const d=await openDB();
+    return await new Promise((ok,no)=>{
+      let tr,store,req;
+      try{tr=d.transaction(STORE,mode);store=tr.objectStore(STORE);req=action(store)}catch(e){no(e);return}
+      req.onsuccess=()=>ok(req.result);
+      req.onerror=()=>no(req.error);
+      tr.onabort=()=>no(tr.error||new Error('本機資料庫交易中止'));
+    });
+  }catch(e){
+    if(retry && (e?.name==='InvalidStateError' || /closing|closed/i.test(e?.message||''))){
+      try{db?.close()}catch(_){ }
+      db=null;dbPromise=null;
+      return idbRequest(mode,action,false);
+    }
+    throw e;
+  }
+}
+function allMessages(){return idbRequest('readonly',s=>s.getAll()).then(x=>x||[])}
+function addMessage(m){return idbRequest('readwrite',s=>s.add(m))}
+function putMessage(m){return idbRequest('readwrite',s=>s.put(m))}
+function clearMessages(){return idbRequest('readwrite',s=>s.clear())}
 const fmt=t=>new Intl.DateTimeFormat('zh-TW',{hour:'2-digit',minute:'2-digit'}).format(new Date(t));
 const day=t=>new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(t));
 const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -26,6 +55,7 @@ function renderMe(){const who=user?`<b>${esc(user.displayName||'已登入')}</b>
 if(user){syncBtn.onclick=syncNow;logoutBtn.onclick=()=>auth.signOut()}else loginBtn.onclick=loginGoogle;exportBtn.onclick=exportData;clearBtn.onclick=async()=>{if(confirm('只清除這台裝置的本機資料？雲端資料不會刪除。')){await clearMessages();renderMe()}}}
 async function loginGoogle(){try{const p=new firebase.auth.GoogleAuthProvider();await auth.signInWithPopup(p)}catch(e){alert('Google 登入沒有完成：'+e.message)}}
 async function syncNow(){if(!user||syncing)return;syncing=true;setStatus('↻ 同步中');try{
+ await openDB();
  let local=await allMessages();
  // 先為舊 V0.1 訊息補 cloudId，再上傳。setDoc 可重複執行而不產生重複資料。
  for(const m of local){if(!m.cloudId){m.cloudId=makeCloudId();await putMessage(m)};await cloud.collection('users').doc(user.uid).collection('messages').doc(m.cloudId).set({role:m.role||'user',text:m.text||'',createdAt:m.createdAt||Date.now()},{merge:true});if(!m.synced){m.synced=true;await putMessage(m)}}
@@ -34,11 +64,11 @@ async function syncNow(){if(!user||syncing)return;syncing=true;setStatus('↻ �
  for(const d of snap.docs){if(ids.has(d.id))continue;const x=d.data();await addMessage({cloudId:d.id,role:x.role||'user',text:x.text||'',createdAt:x.createdAt||Date.now(),synced:true})}
  setStatus('● 已同步');if(tab==='chat')await renderChat();if(tab==='me')renderMe();
  }catch(e){setStatus('● 本機');alert('同步沒有完成：'+e.message)}finally{syncing=false}}
-async function exportData(){let data={version:'0.2',exportedAt:new Date().toISOString(),messages:await allMessages()};let b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=`小樂理專備份_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(u)}
+async function exportData(){let data={version:'0.2.1',exportedAt:new Date().toISOString(),messages:await allMessages()};let b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=`小樂理專備份_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(u)}
 async function sendMsg(){let v=input.value.trim();if(!v)return;const m={role:'user',text:v,createdAt:Date.now(),cloudId:makeCloudId(),synced:false};await addMessage(m);input.value='';await renderChat();if(user)syncNow()}
 send.onclick=sendMsg;input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}};plus.onclick=()=>alert('圖片／網址入口後續版本加入。');
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===b));composer.style.display=tab==='chat'?'block':'none';({chat:renderChat,memory:renderMemory,reminder:renderReminder,me:renderMe}[tab])()});
 auth.onAuthStateChanged(async u=>{user=u||null;if(user){setStatus('↻ 同步中');await syncNow()}else setStatus('● 本機');if(tab==='me')renderMe()});
-openDB().then(d=>{db=d;renderChat()});
-if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.2').catch(()=>{});
+openDB().then(()=>renderChat()).catch(e=>{setStatus('● 本機');alert('本機資料庫開啟失敗：'+e.message)});
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.2.1').catch(()=>{});
 </script></body></html>

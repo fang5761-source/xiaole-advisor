@@ -1,3 +1,8 @@
+小樂理專 V0.2.1｜iOS IndexedDB 同步修正版
+
+修正：iPhone / Safari 在 Google 登入後同步時，IndexedDB 連線可能進入 closing 狀態造成同步失敗。
+加入：資料庫連線自動重開、一次重試、登入同步前確認本機資料庫可用。
+
 小樂理專 V0.2｜Google 登入＋Firestore 雲端同步測試版
 
 這一版新增：
