@@ -1,9 +1,3 @@
-小樂 V0.2.2｜正式名稱與 App Icon 版
-
-本版只在已驗證成功的 V0.2.1 基礎上調整對外顯示：
-1. App 顯示名稱由「小樂理專」改為「小樂」
-2. 加入正式手繪 Icon：192、512、Apple Touch Icon、favicon
-3. 更新 PWA manifest 與 Service Worker 快取版本
-4. 保留 V0.2.1 已驗證的 Google 登入、IndexedDB 與 Firestore 雙向同步邏輯
-
-Firebase 專案、Firestore 規則、GitHub repository 名稱都不需要更改。
+小樂 Icon 安全留白修正版 V2
+保留原定稿手繪圖，不改畫風、不重新生圖。
+僅將完整圖像等比例縮至 84%，置中並增加四周安全留白，避免 iPhone 主畫面遮罩切到右側與下方。
