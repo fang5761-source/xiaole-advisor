@@ -1,20 +1,9 @@
-小樂理專 V0.2.1｜iOS IndexedDB 同步修正版
+小樂 V0.2.2｜正式名稱與 App Icon 版
 
-修正：iPhone / Safari 在 Google 登入後同步時，IndexedDB 連線可能進入 closing 狀態造成同步失敗。
-加入：資料庫連線自動重開、一次重試、登入同步前確認本機資料庫可用。
+本版只在已驗證成功的 V0.2.1 基礎上調整對外顯示：
+1. App 顯示名稱由「小樂理專」改為「小樂」
+2. 加入正式手繪 Icon：192、512、Apple Touch Icon、favicon
+3. 更新 PWA manifest 與 Service Worker 快取版本
+4. 保留 V0.2.1 已驗證的 Google 登入、IndexedDB 與 Firestore 雙向同步邏輯
 
-小樂理專 V0.2｜Google 登入＋Firestore 雲端同步測試版
-
-這一版新增：
-1. Google 帳號登入／登出
-2. 本機 IndexedDB 保留（沿用 V0.1 資料庫）
-3. 登入後，把本機對話同步到 Firestore
-4. 另一台裝置登入同一 Google 帳號，可抓回雲端對話
-5. 「我的」可查看同步狀態、手動立即同步、匯出 JSON 備份
-
-重要：
-- Google 登入不可用 file:// 直接雙擊 index.html 測試；請放到 HTTPS 網站（例如 GitHub Pages）。
-- Firebase Authentication 必須把實際網站網域加入「已授權網域」。
-- Firestore 規則需維持 users/{userId}/... 僅本人 UID 可讀寫。
-- 此版尚未加入 AI 自動回話；目的只驗證登入與跨裝置同步。
-- Firebase Web apiKey 不是密碼；資料權限由 Authentication + Firestore Rules 控制。
+Firebase 專案、Firestore 規則、GitHub repository 名稱都不需要更改。
