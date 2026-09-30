@@ -141,7 +141,7 @@ async function syncNow(){if(!user||syncing)return;syncing=true;setStatus('↻ �
  for(const d of snap.docs){if(ids.has(d.id))continue;const x=d.data();await addMessage({cloudId:d.id,role:x.role||'user',text:x.text||'',createdAt:x.createdAt||Date.now(),synced:true})}
  setStatus('● 已同步');if(tab==='chat')await renderChat();if(tab==='me')renderMe();
  }catch(e){setStatus('● 本機');alert('同步沒有完成：'+e.message)}finally{syncing=false}}
-async function exportData(){let data={version:'0.7-test4',exportedAt:new Date().toISOString(),messages:await allMessages()};let b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=`小樂備份_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(u)}
+async function exportData(){let data={version:'0.7-messageid-test1',exportedAt:new Date().toISOString(),messages:await allMessages()};let b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=`小樂備份_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(u)}
 function showThinking(){
   removeThinking();
   const m=document.querySelector('#main');
@@ -195,7 +195,7 @@ async function sendMsg(){
         'Content-Type':'application/json',
         'Authorization':'Bearer '+idToken
       },
-      body:JSON.stringify({message:v,recent})
+      body:JSON.stringify({message:v,messageId:userMessage.cloudId,recent})
     });
     const data=await r.json();
     if(!r.ok || !data.ok) throw new Error(data?.error || ('HTTP '+r.status));
