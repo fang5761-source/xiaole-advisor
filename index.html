@@ -195,12 +195,7 @@ async function sendMsg(){
         'Content-Type':'application/json',
         'Authorization':'Bearer '+idToken
       },
-      body:JSON.stringify({
-  message:v,
-  messageId:userMessage.cloudId,
-  messageCreatedAt:userMessage.createdAt,
-  recent
-})
+      body:JSON.stringify({message:v,messageId:userMessage.cloudId,messageCreatedAt:userMessage.createdAt,recent})
     });
     const data=await r.json();
     if(!r.ok || !data.ok) throw new Error(data?.error || ('HTTP '+r.status));
@@ -208,6 +203,9 @@ async function sendMsg(){
     // V0.7 messageId 完整性檢查：Worker 回傳的編號必須與這則原始訊息的 cloudId 完全一致。
     if(data.receivedMessageId !== userMessage.cloudId){
       throw new Error('messageId 核對失敗：Worker 收到的編號與原始訊息 cloudId 不一致。');
+    }
+    if(data.receivedMessageCreatedAt !== userMessage.createdAt){
+      throw new Error('messageCreatedAt 核對失敗：Worker 收到的時間與原始訊息 createdAt 不一致。');
     }
 
     const reply=String(data.reply||'').trim();
