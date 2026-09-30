@@ -200,6 +200,7 @@ async function sendMsg(){
     const data=await r.json();
     if(!r.ok || !data.ok) throw new Error(data?.error || ('HTTP '+r.status));
 
+    // V0.7 messageId 完整性檢查：Worker 回傳的編號必須與這則原始訊息的 cloudId 完全一致。
     if(data.receivedMessageId !== userMessage.cloudId){
       throw new Error('messageId 核對失敗：Worker 收到的編號與原始訊息 cloudId 不一致。');
     }
