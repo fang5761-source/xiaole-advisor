@@ -200,6 +200,10 @@ async function sendMsg(){
     const data=await r.json();
     if(!r.ok || !data.ok) throw new Error(data?.error || ('HTTP '+r.status));
 
+    if(data.receivedMessageId !== userMessage.cloudId){
+      throw new Error('messageId 核對失敗：Worker 收到的編號與原始訊息 cloudId 不一致。');
+    }
+
     const reply=String(data.reply||'').trim();
     if(!reply) throw new Error('小樂有收到訊息，但沒有取得回答文字。');
 
