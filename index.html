@@ -195,7 +195,7 @@ async function sendMsg(){
         'Content-Type':'application/json',
         'Authorization':'Bearer '+idToken
       },
-      body:JSON.stringify({message:v,messageId:userMessage.cloudId,messageCreatedAt:userMessage.createdAt,recent})
+      body:JSON.stringify({message:v,messageId:userMessage.cloudId,messageCreatedAt:userMessage.createdAt,messageTimezoneOffsetMinutes:new Date(userMessage.createdAt).getTimezoneOffset(),recent})
     });
     const data=await r.json();
     if(!r.ok || !data.ok) throw new Error(data?.error || ('HTTP '+r.status));
@@ -206,6 +206,10 @@ async function sendMsg(){
     }
     if(data.receivedMessageCreatedAt !== userMessage.createdAt){
       throw new Error('messageCreatedAt 核對失敗：Worker 收到的時間與原始訊息 createdAt 不一致。');
+    }
+    const expectedTimezoneOffsetMinutes=new Date(userMessage.createdAt).getTimezoneOffset();
+    if(data.receivedMessageTimezoneOffsetMinutes !== expectedTimezoneOffsetMinutes){
+      throw new Error('messageTimezoneOffsetMinutes 核對失敗：Worker 收到的時區偏移與原始訊息不一致。');
     }
 
     const reply=String(data.reply||'').trim();
