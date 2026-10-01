@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f6f2e8"><link rel="manifest" href="./manifest.webmanifest?v=0.7-judge-readonly1"><link rel="apple-touch-icon" href="./apple-touch-icon.png?v=0.7-judge-readonly1"><link rel="icon" type="image/png" href="./favicon-64.png?v=0.7-judge-readonly1"><title>小樂</title><style>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f6f2e8"><link rel="manifest" href="./manifest.webmanifest?v=0.7-validation-readonly1"><link rel="apple-touch-icon" href="./apple-touch-icon.png?v=0.7-validation-readonly1"><link rel="icon" type="image/png" href="./favicon-64.png?v=0.7-validation-readonly1"><title>小樂</title><style>
 :root{--bg:#f6f2e8;--card:#fffdf7;--green:#496b57;--soft:#e8efe7;--ink:#27332b;--muted:#788078;--line:#dedfd7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif;background:var(--bg);color:var(--ink)}.app{max-width:720px;margin:auto;min-height:100dvh;display:flex;flex-direction:column}.top{position:sticky;top:0;z-index:20;padding:calc(16px + env(safe-area-inset-top)) 18px 12px;display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-bottom:1px solid transparent}.top h1{font-size:22px;margin:0}.status{font-size:13px;color:var(--green)}main{flex:1;padding:10px 16px 145px}.day{font-size:12px;color:var(--muted);text-align:center;margin:14px}.bubble{max-width:86%;padding:11px 13px;border-radius:18px;margin:8px 0;line-height:1.55;white-space:pre-wrap}.me{margin-left:auto;background:var(--green);color:white;border-bottom-right-radius:6px}.xiaole{background:var(--card);border:1px solid var(--line);border-bottom-left-radius:6px}.time{font-size:10px;opacity:.65;margin-top:5px}.empty{text-align:center;color:var(--muted);padding:80px 28px;line-height:1.8}.composer{position:fixed;left:0;right:0;bottom:64px;padding:8px 12px;background:linear-gradient(transparent,var(--bg) 22%)}.composeInner{max-width:696px;margin:auto;background:white;border:1px solid var(--line);border-radius:22px;display:flex;align-items:flex-end;padding:7px 8px;box-shadow:0 5px 20px #00000010}.composeInner textarea{flex:1;border:0;outline:0;resize:none;font:inherit;max-height:120px;padding:8px;background:transparent}.round{border:0;background:var(--soft);color:var(--green);width:38px;height:38px;border-radius:50%;font-size:20px}.send{background:var(--green);color:white}.nav{position:fixed;left:0;right:0;bottom:0;height:64px;padding-bottom:env(safe-area-inset-bottom);background:#fffdf9;border-top:1px solid var(--line);display:flex;justify-content:center}.navIn{max-width:720px;width:100%;display:grid;grid-template-columns:repeat(4,1fr)}.nav button{border:0;background:transparent;color:var(--muted);font-size:12px}.nav button.active{color:var(--green);font-weight:700}.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:10px 0}.panel h2{font-size:17px;margin:0 0 8px}.small{font-size:13px;color:var(--muted);line-height:1.6}.action{width:100%;margin:6px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:white;text-align:left;color:var(--ink)}input.search{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:14px;font:inherit;background:white}.result{padding:12px 4px;border-bottom:1px solid var(--line)}.thinking{display:flex;align-items:center;gap:8px;color:var(--muted);font-style:normal}.thinkingDots{display:inline-block;min-width:18px;letter-spacing:1px}
 </style></head><body><div class="app"><header class="top"><h1>小樂</h1><div class="status" id="cloudStatus">● 本機</div></header><main id="main"></main></div><div class="composer" id="composer"><div class="composeInner"><button class="round" id="plus">＋</button><textarea id="input" rows="1" placeholder="想到什麼就說……"></textarea><button class="round send" id="send">➤</button></div></div><nav class="nav"><div class="navIn"><button data-tab="chat" class="active">💬<br>小樂</button><button data-tab="memory">📚<br>回憶</button><button data-tab="reminder">🔔<br>提醒</button><button data-tab="me">👤<br>我的</button></div></nav><script src="https://www.gstatic.com/firebasejs/12.3.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.3.0/firebase-auth-compat.js"></script>
@@ -11,6 +11,7 @@ const DB='xiaole-advisor-v01',STORE='messages';let db=null,dbPromise=null,tab='c
 let lastCandidateObservation=null;
 let lastRelatedCardsObservation=null;
 let lastJudgeObservation=null;
+let lastValidationObservation=null;
 function openDB(){
   if(db) return Promise.resolve(db);
   if(dbPromise) return dbPromise;
@@ -143,7 +144,134 @@ async function buildJudgeObservation(messageId,candidates,groups){
   return {messageId,decisions};
 }
 
-function renderMe(){const who=user?`<b>${esc(user.displayName||'已登入')}</b><br>${esc(user.email||'')}`:'尚未登入 Google 帳號';document.querySelector('#main').innerHTML=`<div class="panel"><h2>Google 帳號</h2><div class="small">${who}</div>${user?'<button class="action" id="syncBtn">☁️ 立即同步</button><button class="action" id="logoutBtn">登出 Google</button>':'<button class="action" id="loginBtn">G　使用 Google 帳號登入</button>'}</div><div class="panel"><h2>🌱 小樂管家</h2><div class="small" id="butlerStatus">尚未測試後端連線。</div><button class="action" id="butlerBtn">🤝 握手測試</button></div><div class="panel"><h2>🧪 V0.7 記憶測試</h2><div class="small" id="memoryTestStatus">只建立一張假的測試記憶卡，不會接進聊天自動記憶。</div><button class="action" id="memoryTestBtn">建立「藍色杯子」測試記憶</button></div><div class="panel"><h2>🧠 小樂記得的事</h2><div class="small" id="memoryReadStatus">尚未讀取記憶。</div><button class="action" id="memoryReadBtn">📖 讀取記憶</button><button class="action" id="memoryUpdateBtn">✏️ 把藍色杯子改成綠色杯子</button><button class="action" id="memoryDeleteBtn">🗑️ 刪除綠色杯子測試記憶</button><div id="memoryReadResults"></div></div><div class="panel"><h2>✏️ Candidate 唯讀觀察</h2><div class="small" id="candidateStatus">${lastCandidateObservation?`上一則訊息：${esc(lastCandidateObservation.messageId)} · ${lastCandidateObservation.candidates.length} 個 Candidate`:'尚未收到 Candidate 測試結果。'}</div><div id="candidateResults">${lastCandidateObservation?(lastCandidateObservation.candidates.length?lastCandidateObservation.candidates.map((x,i)=>`<div class="result"><b>Candidate ${i+1} · ${esc(x.targetType||'')}</b><br><span class="small">${esc(JSON.stringify(x,null,2))}</span></div>`).join(''):'<div class="small">✅ candidates = []（這一則沒有值得提名的長期記憶）</div>'):''}</div><div class="small" style="margin-top:8px">唯讀：這裡只顯示 AI 提名，不會自動寫入 Memory 或 Item。</div></div><div class="panel"><h2>🔎 relatedCards 唯讀觀察</h2><div class="small">${lastRelatedCardsObservation?`上一則訊息：${esc(lastRelatedCardsObservation.messageId)} · ${lastRelatedCardsObservation.groups.length} 組查找結果`:'尚未執行 relatedCards 查找。'}</div><div>${lastRelatedCardsObservation?(lastRelatedCardsObservation.groups.length?lastRelatedCardsObservation.groups.map((g,i)=>`<div class="result"><b>Candidate ${g.candidateIndex+1} · ${esc(g.candidateType)}</b><br><span class="small">${g.cards.length?esc(JSON.stringify(g.cards,null,2)):'✅ relatedCards = []（目前沒有符合條件的既有卡片）'}</span></div>`).join(''):'<div class="small">✅ 沒有 Candidate，所以不需要查 relatedCards。</div>'):''}</div><div class="small" style="margin-top:8px">唯讀：只讀取 Firestore 既有 Memory / Item，不新增、不更新、不刪除任何卡片。</div></div><div class="panel"><h2>⚖️ Judge 唯讀觀察</h2><div class="small">${lastJudgeObservation?`上一則訊息：${esc(lastJudgeObservation.messageId)} · ${lastJudgeObservation.decisions.length} 個裁決`:'尚未執行 Judge。'}</div><div>${lastJudgeObservation?(lastJudgeObservation.decisions.length?lastJudgeObservation.decisions.map((d,i)=>`<div class="result"><b>Candidate ${d.candidateIndex+1} · ${esc(d.candidateType)}</b><br><span class="small">${d.error?`❌ ${esc(d.error)}`:esc(JSON.stringify(d.judge,null,2))}</span></div>`).join(''):'<div class="small">✅ 沒有 Candidate，所以不需要 Judge。</div>'):''}</div><div class="small" style="margin-top:8px">唯讀：Judge 只提出 CREATE / UPDATE / RETIRE / HOLD / NO_ACTION 裁決，不會執行任何 Memory / Item 寫入。</div></div><div class="panel"><h2>資料保險</h2><div class="small">本機資料仍保留；登入後另同步一份到 Firestore。匯出包可再留一份在自己手上。</div><button class="action" id="exportBtn">📦 匯出文字備份</button><button class="action" id="clearBtn">清除本機測試資料</button></div>`;
+
+function containsBlockedSecret(candidate){
+  const text=JSON.stringify(candidate||{});
+  const patterns=[
+    /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i,
+    /\b(?:sk|pk)-[A-Za-z0-9_-]{20,}\b/,
+    /\bAIza[0-9A-Za-z_-]{20,}\b/,
+    /\b(?:api[_ -]?key|password|passwd|密碼|驗證碼|一次性密碼|otp)\s*[:：=]\s*\S{4,}/i,
+    /\b(?:\d[ -]*?){13,19}\b/
+  ];
+  return patterns.some(p=>p.test(text));
+}
+
+function validateDecisionReadOnly(messageId,candidate,relatedCards,judge){
+  const reasons=[];
+  const allowedIds=new Set((relatedCards||[]).map(x=>x?.id).filter(Boolean));
+  const action=judge?.action;
+  const targetId=judge?.targetId ?? null;
+  const replacement=judge?.replacement ?? null;
+  const target=(relatedCards||[]).find(x=>x?.id===targetId) || null;
+
+  if(!["CREATE","UPDATE","RETIRE","HOLD","NO_ACTION"].includes(action))
+    reasons.push("未知的 action。");
+
+  if(containsBlockedSecret(candidate))
+    reasons.push("Candidate 疑似含密碼、驗證碼、API key、私鑰或完整卡號等秘密資料。");
+
+  if(candidate?.sensitivity==="sensitive" && candidate?.evidenceType==="derived" && action==="CREATE")
+    reasons.push("derived 的敏感資訊不可自動 CREATE。");
+
+  if(targetId!==null && !allowedIds.has(targetId))
+    reasons.push("targetId 不在本次 relatedCards 允許清單中。");
+
+  if(action==="CREATE" && targetId!==null)
+    reasons.push("CREATE 不可指定 targetId。");
+
+  if(["UPDATE","RETIRE"].includes(action) && targetId===null)
+    reasons.push(`${action} 必須指定既有 targetId。`);
+
+  if(action==="RETIRE" && candidate?.targetType==="item")
+    reasons.push("Item 不使用 RETIRE；生命週期只能用 UPDATE 改 state。");
+
+  if(action==="UPDATE" && target && target.targetType!==candidate?.targetType)
+    reasons.push("UPDATE 的 targetType 與 Candidate 不一致。");
+
+  if(action==="RETIRE" && target && target.targetType!=="memory")
+    reasons.push("RETIRE 的 target 必須是 Memory。");
+
+  if(action==="UPDATE" && candidate?.targetType==="item"){
+    const nextState=replacement?.state ?? candidate?.state ?? null;
+    if(["completed","abandoned"].includes(nextState) && candidate?.evidenceType!=="explicit")
+      reasons.push("Item 進入 completed / abandoned 必須有 explicit 證據。");
+  }
+
+  if(action==="RETIRE"){
+    const rr=replacement?.retireReason ?? null;
+    if(!["superseded","resolved"].includes(rr))
+      reasons.push("RETIRE 必須明確指定 retireReason=superseded 或 resolved。");
+
+    if(rr==="resolved"){
+      if(target?.memoryType!=="contextual")
+        reasons.push("resolved 只適用於 contextual Memory。");
+      if(candidate?.evidenceType!=="explicit")
+        reasons.push("resolved 必須有 explicit 證據。");
+    }
+
+    if(rr==="superseded"){
+      if(!replacement || !String(replacement?.content||"").trim())
+        reasons.push("superseded 必須帶有新的 Memory replacement content。");
+    }
+  }
+
+  if(action==="UPDATE" && !replacement)
+    reasons.push("UPDATE 必須提供 replacement。");
+
+  const pass=reasons.length===0;
+  const writeEligible=pass && ["CREATE","UPDATE","RETIRE"].includes(action);
+
+  return {
+    status:pass?"PASS":"BLOCK",
+    writeEligible,
+    action:action||null,
+    targetId,
+    sourceMessageIds:[messageId],
+    reasons:pass
+      ? [writeEligible
+          ? "通過硬規則；目前仍為唯讀，不會寫入 Firestore。"
+          : "裁決本身合法，但 HOLD / NO_ACTION 本來就不應寫入 Firestore。"]
+      : reasons
+  };
+}
+
+function buildValidationObservation(messageId,candidates,groups,judgeObservation){
+  const results=[];
+  for(let i=0;i<(candidates||[]).length;i++){
+    const group=(groups||[]).find(g=>g.candidateIndex===i);
+    const decision=(judgeObservation?.decisions||[]).find(d=>d.candidateIndex===i);
+    if(!decision || decision.error || !decision.judge){
+      results.push({
+        candidateIndex:i,
+        candidateType:candidates[i]?.targetType||"",
+        validation:{
+          status:"BLOCK",
+          writeEligible:false,
+          action:null,
+          targetId:null,
+          sourceMessageIds:[messageId],
+          reasons:[decision?.error || "沒有可驗證的 Judge 裁決。"]
+        }
+      });
+      continue;
+    }
+    results.push({
+      candidateIndex:i,
+      candidateType:candidates[i]?.targetType||"",
+      validation:validateDecisionReadOnly(
+        messageId,
+        candidates[i],
+        group?.cards||[],
+        decision.judge
+      )
+    });
+  }
+  return {messageId,results};
+}
+
+
+function renderMe(){const who=user?`<b>${esc(user.displayName||'已登入')}</b><br>${esc(user.email||'')}`:'尚未登入 Google 帳號';document.querySelector('#main').innerHTML=`<div class="panel"><h2>Google 帳號</h2><div class="small">${who}</div>${user?'<button class="action" id="syncBtn">☁️ 立即同步</button><button class="action" id="logoutBtn">登出 Google</button>':'<button class="action" id="loginBtn">G　使用 Google 帳號登入</button>'}</div><div class="panel"><h2>🌱 小樂管家</h2><div class="small" id="butlerStatus">尚未測試後端連線。</div><button class="action" id="butlerBtn">🤝 握手測試</button></div><div class="panel"><h2>🧪 V0.7 記憶測試</h2><div class="small" id="memoryTestStatus">只建立一張假的測試記憶卡，不會接進聊天自動記憶。</div><button class="action" id="memoryTestBtn">建立「藍色杯子」測試記憶</button></div><div class="panel"><h2>🧠 小樂記得的事</h2><div class="small" id="memoryReadStatus">尚未讀取記憶。</div><button class="action" id="memoryReadBtn">📖 讀取記憶</button><button class="action" id="memoryUpdateBtn">✏️ 把藍色杯子改成綠色杯子</button><button class="action" id="memoryDeleteBtn">🗑️ 刪除綠色杯子測試記憶</button><div id="memoryReadResults"></div></div><div class="panel"><h2>✏️ Candidate 唯讀觀察</h2><div class="small" id="candidateStatus">${lastCandidateObservation?`上一則訊息：${esc(lastCandidateObservation.messageId)} · ${lastCandidateObservation.candidates.length} 個 Candidate`:'尚未收到 Candidate 測試結果。'}</div><div id="candidateResults">${lastCandidateObservation?(lastCandidateObservation.candidates.length?lastCandidateObservation.candidates.map((x,i)=>`<div class="result"><b>Candidate ${i+1} · ${esc(x.targetType||'')}</b><br><span class="small">${esc(JSON.stringify(x,null,2))}</span></div>`).join(''):'<div class="small">✅ candidates = []（這一則沒有值得提名的長期記憶）</div>'):''}</div><div class="small" style="margin-top:8px">唯讀：這裡只顯示 AI 提名，不會自動寫入 Memory 或 Item。</div></div><div class="panel"><h2>🔎 relatedCards 唯讀觀察</h2><div class="small">${lastRelatedCardsObservation?`上一則訊息：${esc(lastRelatedCardsObservation.messageId)} · ${lastRelatedCardsObservation.groups.length} 組查找結果`:'尚未執行 relatedCards 查找。'}</div><div>${lastRelatedCardsObservation?(lastRelatedCardsObservation.groups.length?lastRelatedCardsObservation.groups.map((g,i)=>`<div class="result"><b>Candidate ${g.candidateIndex+1} · ${esc(g.candidateType)}</b><br><span class="small">${g.cards.length?esc(JSON.stringify(g.cards,null,2)):'✅ relatedCards = []（目前沒有符合條件的既有卡片）'}</span></div>`).join(''):'<div class="small">✅ 沒有 Candidate，所以不需要查 relatedCards。</div>'):''}</div><div class="small" style="margin-top:8px">唯讀：只讀取 Firestore 既有 Memory / Item，不新增、不更新、不刪除任何卡片。</div></div><div class="panel"><h2>⚖️ Judge 唯讀觀察</h2><div class="small">${lastJudgeObservation?`上一則訊息：${esc(lastJudgeObservation.messageId)} · ${lastJudgeObservation.decisions.length} 個裁決`:'尚未執行 Judge。'}</div><div>${lastJudgeObservation?(lastJudgeObservation.decisions.length?lastJudgeObservation.decisions.map((d,i)=>`<div class="result"><b>Candidate ${d.candidateIndex+1} · ${esc(d.candidateType)}</b><br><span class="small">${d.error?`❌ ${esc(d.error)}`:esc(JSON.stringify(d.judge,null,2))}</span></div>`).join(''):'<div class="small">✅ 沒有 Candidate，所以不需要 Judge。</div>'):''}</div><div class="small" style="margin-top:8px">唯讀：Judge 只提出 CREATE / UPDATE / RETIRE / HOLD / NO_ACTION 裁決，不會執行任何 Memory / Item 寫入。</div></div><div class="panel"><h2>🛡️ Validation 唯讀觀察</h2><div class="small">${lastValidationObservation?`上一則訊息：${esc(lastValidationObservation.messageId)} · ${lastValidationObservation.results.length} 個驗章結果`:'尚未執行 Validation。'}</div><div>${lastValidationObservation?(lastValidationObservation.results.length?lastValidationObservation.results.map((d,i)=>`<div class="result"><b>Candidate ${d.candidateIndex+1} · ${esc(d.candidateType)} · ${esc(d.validation.status)}</b><br><span class="small">${esc(JSON.stringify(d.validation,null,2))}</span></div>`).join(''):'<div class="small">✅ 沒有 Candidate，所以不需要 Validation。</div>'):''}</div><div class="small" style="margin-top:8px">唯讀：Validation 只用程式硬規則驗章。PASS 也不代表已寫入；本版仍不新增、不更新、不刪除任何 Memory / Item。</div></div><div class="panel"><h2>資料保險</h2><div class="small">本機資料仍保留；登入後另同步一份到 Firestore。匯出包可再留一份在自己手上。</div><button class="action" id="exportBtn">📦 匯出文字備份</button><button class="action" id="clearBtn">清除本機測試資料</button></div>`;
 if(user){syncBtn.onclick=syncNow;logoutBtn.onclick=()=>auth.signOut()}else loginBtn.onclick=loginGoogle;butlerBtn.onclick=testButler;const memoryTestBtn=document.getElementById('memoryTestBtn');if(memoryTestBtn)memoryTestBtn.onclick=createMemoryTest;const memoryReadBtn=document.getElementById('memoryReadBtn');if(memoryReadBtn)memoryReadBtn.onclick=readMemories;const memoryUpdateBtn=document.getElementById('memoryUpdateBtn');if(memoryUpdateBtn)memoryUpdateBtn.onclick=updateMemoryTest;const memoryDeleteBtn=document.getElementById('memoryDeleteBtn');if(memoryDeleteBtn)memoryDeleteBtn.onclick=deleteMemoryTest;exportBtn.onclick=exportData;clearBtn.onclick=async()=>{if(confirm('只清除這台裝置的本機資料？雲端資料不會刪除。')){await clearMessages();renderMe()}}}
 async function deleteMemoryTest(){
  const el=document.getElementById('memoryReadStatus'),btn=document.getElementById('memoryDeleteBtn');
@@ -317,6 +445,12 @@ async function sendMsg(){
       lastCandidateObservation.candidates,
       lastRelatedCardsObservation.groups
     );
+    lastValidationObservation=buildValidationObservation(
+      userMessage.cloudId,
+      lastCandidateObservation.candidates,
+      lastRelatedCardsObservation.groups,
+      lastJudgeObservation
+    );
 
     const reply=String(data.reply||'').trim();
     if(!reply) throw new Error('小樂有收到訊息，但沒有取得回答文字。');
@@ -341,5 +475,5 @@ send.onclick=sendMsg;input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.prev
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===b));composer.style.display=tab==='chat'?'block':'none';({chat:renderChat,memory:renderMemory,reminder:renderReminder,me:renderMe}[tab])()});
 auth.onAuthStateChanged(async u=>{user=u||null;if(user){setStatus('↻ 同步中');await syncNow()}else setStatus('● 本機');if(tab==='me')renderMe()});
 openDB().then(()=>renderChat()).catch(e=>{setStatus('● 本機');alert('本機資料庫開啟失敗：'+e.message)});
-if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.7-judge-readonly1').catch(()=>{});
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.7-validation-readonly1').catch(()=>{});
 </script></body></html>
