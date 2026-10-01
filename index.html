@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f6f2e8"><link rel="manifest" href="./manifest.webmanifest?v=0.7-recall-answer1"><link rel="apple-touch-icon" href="./apple-touch-icon.png?v=0.7-recall-answer1"><link rel="icon" type="image/png" href="./favicon-64.png?v=0.7-recall-answer1"><title>小樂</title><style>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f6f2e8"><link rel="manifest" href="./manifest.webmanifest?v=0.7-recall-guard2"><link rel="apple-touch-icon" href="./apple-touch-icon.png?v=0.7-recall-guard2"><link rel="icon" type="image/png" href="./favicon-64.png?v=0.7-recall-guard2"><title>小樂</title><style>
 :root{--bg:#f6f2e8;--card:#fffdf7;--green:#496b57;--soft:#e8efe7;--ink:#27332b;--muted:#788078;--line:#dedfd7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif;background:var(--bg);color:var(--ink)}.app{max-width:720px;margin:auto;min-height:100dvh;display:flex;flex-direction:column}.top{position:sticky;top:0;z-index:20;padding:calc(16px + env(safe-area-inset-top)) 18px 12px;display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-bottom:1px solid transparent}.top h1{font-size:22px;margin:0}.status{font-size:13px;color:var(--green)}main{flex:1;padding:10px 16px 145px}.day{font-size:12px;color:var(--muted);text-align:center;margin:14px}.bubble{max-width:86%;padding:11px 13px;border-radius:18px;margin:8px 0;line-height:1.55;white-space:pre-wrap}.me{margin-left:auto;background:var(--green);color:white;border-bottom-right-radius:6px}.xiaole{background:var(--card);border:1px solid var(--line);border-bottom-left-radius:6px}.time{font-size:10px;opacity:.65;margin-top:5px}.empty{text-align:center;color:var(--muted);padding:80px 28px;line-height:1.8}.composer{position:fixed;left:0;right:0;bottom:64px;padding:8px 12px;background:linear-gradient(transparent,var(--bg) 22%)}.composeInner{max-width:696px;margin:auto;background:white;border:1px solid var(--line);border-radius:22px;display:flex;align-items:flex-end;padding:7px 8px;box-shadow:0 5px 20px #00000010}.composeInner textarea{flex:1;border:0;outline:0;resize:none;font:inherit;max-height:120px;padding:8px;background:transparent}.round{border:0;background:var(--soft);color:var(--green);width:38px;height:38px;border-radius:50%;font-size:20px}.send{background:var(--green);color:white}.nav{position:fixed;left:0;right:0;bottom:0;height:64px;padding-bottom:env(safe-area-inset-bottom);background:#fffdf9;border-top:1px solid var(--line);display:flex;justify-content:center}.navIn{max-width:720px;width:100%;display:grid;grid-template-columns:repeat(4,1fr)}.nav button{border:0;background:transparent;color:var(--muted);font-size:12px}.nav button.active{color:var(--green);font-weight:700}.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:10px 0}.panel h2{font-size:17px;margin:0 0 8px}.small{font-size:13px;color:var(--muted);line-height:1.6}.action{width:100%;margin:6px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:white;text-align:left;color:var(--ink)}input.search{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:14px;font:inherit;background:white}.result{padding:12px 4px;border-bottom:1px solid var(--line)}.thinking{display:flex;align-items:center;gap:8px;color:var(--muted);font-style:normal}.thinkingDots{display:inline-block;min-width:18px;letter-spacing:1px}
 </style></head><body><div class="app"><header class="top"><h1>小樂</h1><div class="status" id="cloudStatus">● 本機</div></header><main id="main"></main></div><div class="composer" id="composer"><div class="composeInner"><button class="round" id="plus">＋</button><textarea id="input" rows="1" placeholder="想到什麼就說……"></textarea><button class="round send" id="send">➤</button></div></div><nav class="nav"><div class="navIn"><button data-tab="chat" class="active">💬<br>小樂</button><button data-tab="memory">📚<br>回憶</button><button data-tab="reminder">🔔<br>提醒</button><button data-tab="me">👤<br>我的</button></div></nav><script src="https://www.gstatic.com/firebasejs/12.3.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.3.0/firebase-auth-compat.js"></script>
@@ -664,6 +664,33 @@ function sensitiveLikelyRelevant(message,card){
   return words.some(w=>hay.includes(w));
 }
 
+function isRecallEligibleV1Card(targetType,data){
+  if(!data || typeof data!=="object") return false;
+
+  const sensitivityOk=["normal","sensitive"].includes(String(data.sensitivity||""));
+  const evidenceTypeOk=["explicit","derived"].includes(String(data.evidenceType||""));
+  const sourceIdsOk=Array.isArray(data.sourceMessageIds) && data.sourceMessageIds.length>0 &&
+    data.sourceMessageIds.every(x=>typeof x==="string" && x.trim());
+  const evidenceSummaryOk=typeof data.evidenceSummary==="string" && data.evidenceSummary.trim().length>0;
+  const createdAtOk=Number.isFinite(data.createdAt);
+  const updatedAtOk=Number.isFinite(data.updatedAt);
+
+  if(!sensitivityOk || !evidenceTypeOk || !sourceIdsOk || !evidenceSummaryOk || !createdAtOk || !updatedAtOk) return false;
+
+  if(targetType==="memory"){
+    return typeof data.content==="string" && data.content.trim().length>0 &&
+      ["關於姐姐","重要的人","偏好與習慣","互動規則"].includes(String(data.category||"")) &&
+      ["stable","contextual"].includes(String(data.memoryType||"")) &&
+      ["active","retired"].includes(String(data.status||""));
+  }
+
+  if(targetType==="item"){
+    return typeof data.title==="string" && data.title.trim().length>0 &&
+      ["ongoing","paused","completed","abandoned"].includes(String(data.state||""));
+  }
+  return false;
+}
+
 function compactRecallCard(id,targetType,data){
   if(targetType==="memory"){
     return {
@@ -705,11 +732,13 @@ async function loadRecallPoolReadOnly(currentUserMessage){
   const cards=[];
   memorySnap.forEach(doc=>{
     const data=doc.data()||{};
+    if(!isRecallEligibleV1Card("memory",data)) return;
     const card=compactRecallCard(doc.id,"memory",data);
     if(card.sensitivity!=="sensitive" || sensitiveLikelyRelevant(currentUserMessage,card)) cards.push(card);
   });
   itemSnap.forEach(doc=>{
     const data=doc.data()||{};
+    if(!isRecallEligibleV1Card("item",data)) return;
     const card=compactRecallCard(doc.id,"item",data);
     if(card.sensitivity!=="sensitive" || sensitiveLikelyRelevant(currentUserMessage,card)) cards.push(card);
   });
@@ -719,7 +748,7 @@ async function loadRecallPoolReadOnly(currentUserMessage){
 async function runRecallReadOnly(currentUserMessage,idToken){
   const cards=await loadRecallPoolReadOnly(currentUserMessage);
   if(!cards.length){
-    return {query:currentUserMessage,poolCount:0,selectedCards:[],recall:{shouldRecall:false,selectedIds:[],reason:"目前沒有可供 Recall 判斷的卡片。"}};
+    return {query:currentUserMessage,poolCount:0,selectedCards:[],recall:{shouldRecall:false,selectedKeys:[],reason:"目前沒有可供 Recall 判斷的卡片。"}};
   }
 
   const r=await fetch(BUTLER_URL,{
@@ -728,14 +757,21 @@ async function runRecallReadOnly(currentUserMessage,idToken){
       "Content-Type":"application/json",
       "Authorization":"Bearer "+idToken
     },
-    body:JSON.stringify({mode:"recall",currentUserMessage,cards})
+    body:JSON.stringify({
+      mode:"recall",
+      currentUserMessage,
+      cards:cards.map((card,index)=>{
+        const {id,...safeCard}=card;
+        return {selectionKey:"C"+(index+1),...safeCard};
+      })
+    })
   });
   const data=await r.json();
   if(!r.ok || !data.ok) throw new Error(data?.error || ("Recall HTTP "+r.status));
 
-  const selectedIds=Array.isArray(data?.recall?.selectedIds)?data.recall.selectedIds:[];
-  const byId=new Map(cards.map(x=>[x.id,x]));
-  const selectedCards=selectedIds.map(id=>byId.get(id)).filter(Boolean);
+  const selectedKeys=Array.isArray(data?.recall?.selectedKeys)?data.recall.selectedKeys:[];
+  const byKey=new Map(cards.map((card,index)=>["C"+(index+1),card]));
+  const selectedCards=selectedKeys.map(key=>byKey.get(key)).filter(Boolean);
 
   return {
     query:currentUserMessage,
@@ -893,7 +929,7 @@ async function sendMsg(){
       recallResult={
         poolCount:0,
         selectedCards:[],
-        recall:{shouldRecall:false,selectedIds:[],reason:"❌ Recall 發生錯誤："+String(recallError?.message||recallError)}
+        recall:{shouldRecall:false,selectedKeys:[],reason:"❌ Recall 發生錯誤："+String(recallError?.message||recallError)}
       };
       lastRecallObservation={messageId:userMessage.cloudId,...recallResult};
     }
@@ -985,5 +1021,5 @@ send.onclick=sendMsg;input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.prev
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===b));composer.style.display=tab==='chat'?'block':'none';({chat:renderChat,memory:renderMemory,reminder:renderReminder,me:renderMe}[tab])()});
 auth.onAuthStateChanged(async u=>{user=u||null;if(user){setStatus('↻ 同步中');await syncNow()}else setStatus('● 本機');if(tab==='me')renderMe()});
 openDB().then(()=>renderChat()).catch(e=>{setStatus('● 本機');alert('本機資料庫開啟失敗：'+e.message)});
-if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.7-recall-answer1').catch(()=>{});
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.7-recall-guard2').catch(()=>{});
 </script></body></html>
