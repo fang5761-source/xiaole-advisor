@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f6f2e8"><link rel="manifest" href="./manifest.webmanifest?v=0.7-memory-cabinet1"><link rel="apple-touch-icon" href="./apple-touch-icon.png?v=0.7-memory-cabinet1"><link rel="icon" type="image/png" href="./favicon-64.png?v=0.7-memory-cabinet1"><title>小樂</title><style>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f6f2e8"><link rel="manifest" href="./manifest.webmanifest?v=0.8-notification-doorbell1"><link rel="apple-touch-icon" href="./apple-touch-icon.png?v=0.8-notification-doorbell1"><link rel="icon" type="image/png" href="./favicon-64.png?v=0.8-notification-doorbell1"><title>小樂</title><style>
 :root{--bg:#f6f2e8;--card:#fffdf7;--green:#496b57;--soft:#e8efe7;--ink:#27332b;--muted:#788078;--line:#dedfd7}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif;background:var(--bg);color:var(--ink)}.app{max-width:720px;margin:auto;min-height:100dvh;display:flex;flex-direction:column}.top{position:sticky;top:0;z-index:20;padding:calc(16px + env(safe-area-inset-top)) 18px 12px;display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-bottom:1px solid transparent}.top h1{font-size:22px;margin:0}.status{font-size:13px;color:var(--green)}main{flex:1;padding:10px 16px 145px}.day{font-size:12px;color:var(--muted);text-align:center;margin:14px}.bubble{max-width:86%;padding:11px 13px;border-radius:18px;margin:8px 0;line-height:1.55;white-space:pre-wrap}.me{margin-left:auto;background:var(--green);color:white;border-bottom-right-radius:6px}.xiaole{background:var(--card);border:1px solid var(--line);border-bottom-left-radius:6px}.time{font-size:10px;opacity:.65;margin-top:5px}.empty{text-align:center;color:var(--muted);padding:80px 28px;line-height:1.8}.composer{position:fixed;left:0;right:0;bottom:64px;padding:8px 12px;background:linear-gradient(transparent,var(--bg) 22%)}.composeInner{max-width:696px;margin:auto;background:white;border:1px solid var(--line);border-radius:22px;display:flex;align-items:flex-end;padding:7px 8px;box-shadow:0 5px 20px #00000010}.composeInner textarea{flex:1;border:0;outline:0;resize:none;font:inherit;max-height:120px;padding:8px;background:transparent}.round{border:0;background:var(--soft);color:var(--green);width:38px;height:38px;border-radius:50%;font-size:20px}.send{background:var(--green);color:white}.nav{position:fixed;left:0;right:0;bottom:0;height:64px;padding-bottom:env(safe-area-inset-bottom);background:#fffdf9;border-top:1px solid var(--line);display:flex;justify-content:center}.navIn{max-width:720px;width:100%;display:grid;grid-template-columns:repeat(4,1fr)}.nav button{border:0;background:transparent;color:var(--muted);font-size:12px}.nav button.active{color:var(--green);font-weight:700}.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:10px 0}.panel h2{font-size:17px;margin:0 0 8px}.small{font-size:13px;color:var(--muted);line-height:1.6}.action{width:100%;margin:6px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:white;text-align:left;color:var(--ink)}input.search{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:14px;font:inherit;background:white}.result{padding:12px 4px;border-bottom:1px solid var(--line)}.thinking{display:flex;align-items:center;gap:8px;color:var(--muted);font-style:normal}.thinkingDots{display:inline-block;min-width:18px;letter-spacing:1px}
 </style></head><body><div class="app"><header class="top"><h1>小樂</h1><div class="status" id="cloudStatus">● 本機</div></header><main id="main"></main></div><div class="composer" id="composer"><div class="composeInner"><button class="round" id="plus">＋</button><textarea id="input" rows="1" placeholder="想到什麼就說……"></textarea><button class="round send" id="send">➤</button></div></div><nav class="nav"><div class="navIn"><button data-tab="chat" class="active">💬<br>小樂</button><button data-tab="memory">📚<br>回憶</button><button data-tab="reminder">🔔<br>提醒</button><button data-tab="me">👤<br>我的</button></div></nav><script src="https://www.gstatic.com/firebasejs/12.3.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.3.0/firebase-auth-compat.js"></script>
@@ -103,7 +103,43 @@ async function renderMemory(){
     main.innerHTML=`<div class="panel"><h2>📚 回憶</h2><div class="small">❌ 讀取失敗：${esc(e?.message||e)}</div></div>`;
   }
 }
-function renderReminder(){document.querySelector('#main').innerHTML='<div class="panel"><h2>提醒</h2><div class="small">V0.2 先完成登入與同步。提醒功能下一階段加入。</div></div>'}
+function renderReminder(){
+  const supported=('serviceWorker' in navigator) && ('Notification' in window);
+  const permission=('Notification' in window)?Notification.permission:'unsupported';
+  const label=permission==='granted'?'已允許':permission==='denied'?'已拒絕':permission==='default'?'尚未詢問':'不支援';
+  document.querySelector('#main').innerHTML=`<div class="panel"><h2>🔔 提醒</h2><div class="small">門鈴測試版：先只確認這台裝置能否允許通知並顯示一則本機測試通知。這一步不建立 Reminder、不寫 Firestore，也不會動 Memory / Item。</div></div><div class="panel"><h2>通知權限</h2><div class="small" id="notificationStatus">目前：${esc(label)}</div><button class="action" id="notificationTestBtn" ${supported?'':'disabled'}>🔔 測試通知</button><div class="small" style="margin-top:8px">第一次按下時，系統可能會詢問是否允許「小樂」傳送通知。請選「允許」。</div></div>`;
+  const btn=document.getElementById('notificationTestBtn');
+  if(btn) btn.onclick=testLocalNotification;
+}
+
+async function testLocalNotification(){
+  const el=document.getElementById('notificationStatus');
+  const btn=document.getElementById('notificationTestBtn');
+  if(!el||!btn)return;
+  if(!('serviceWorker' in navigator) || !('Notification' in window)){el.textContent='❌ 這個環境目前不支援 Web 通知。';return}
+  btn.disabled=true;
+  try{
+    let permission=Notification.permission;
+    if(permission==='default') permission=await Notification.requestPermission();
+    if(permission!=='granted'){
+      el.textContent=permission==='denied'?'❌ 通知權限已被拒絕。':'⭕ 尚未取得通知權限。';
+      return;
+    }
+    el.textContent='已允許通知，正在敲門鈴……';
+    const reg=await navigator.serviceWorker.ready;
+    await reg.showNotification('🔔 小樂門鈴測試',{
+      body:'姐姐，如果妳看到這則通知，第一關就成功了 😆',
+      icon:'./icon-192.png',
+      badge:'./favicon-64.png',
+      tag:'xiaole-local-doorbell-test',
+      renotify:false,
+      data:{url:'./'}
+    });
+    el.textContent='✅ 測試通知已送出。請看看 iPhone 是否出現「小樂門鈴測試」。';
+  }catch(e){
+    el.textContent='❌ 測試失敗：'+String(e?.message||e);
+  }finally{btn.disabled=false}
+}
 
 async function loadRelatedCardsReadOnly(candidates){
   const result=[];
@@ -1077,5 +1113,5 @@ send.onclick=sendMsg;input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.prev
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===b));composer.style.display=tab==='chat'?'block':'none';({chat:renderChat,memory:renderMemory,reminder:renderReminder,me:renderMe}[tab])()});
 auth.onAuthStateChanged(async u=>{user=u||null;if(user){setStatus('↻ 同步中');await syncNow()}else setStatus('● 本機');if(tab==='me')renderMe()});
 openDB().then(()=>renderChat()).catch(e=>{setStatus('● 本機');alert('本機資料庫開啟失敗：'+e.message)});
-if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.7-memory-cabinet1').catch(()=>{});
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.8-notification-doorbell1').catch(()=>{});
 </script></body></html>
