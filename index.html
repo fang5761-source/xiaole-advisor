@@ -112,11 +112,47 @@ function renderReminder(){
   const supported=('serviceWorker' in navigator)&&('Notification' in window)&&('PushManager' in window);
   const permission=('Notification' in window)?Notification.permission:'unsupported';
   const label=permission==='granted'?'已允許':permission==='denied'?'已拒絕':permission==='default'?'尚未詢問':'不支援';
-  document.querySelector('#main').innerHTML=`<div class="panel"><h2>🔔 提醒</h2><div class="small">Push 收件地址測試版：第一關本機門鈴已成功。現在只確認這台 iPhone 能否建立真正的 Web Push subscription。這一步仍不建立 Reminder、不寫 Firestore，也不會動 Memory / Item。</div></div><div class="panel"><h2>通知權限</h2><div class="small">目前：${esc(label)}</div><button class="action" id="notificationTestBtn" ${supported?'':'disabled'}>🔔 再測一次本機通知</button></div><div class="panel"><h2>📮 Push 收件地址</h2><div class="small" id="pushSubscriptionStatus">尚未檢查這台裝置的 Push subscription。</div><button class="action" id="pushSubscriptionBtn" ${supported?'':'disabled'}>📮 建立 Push 收件地址</button><div class="small" style="margin-top:8px">成功後只確認 subscription 已建立；這一版不顯示 endpoint 或金鑰，也不會上傳到 Firestore / Cloudflare。</div></div><div class="panel"><h2>🧪 Reminder API 門禁測試</h2><div class="small" id="reminderApiTestStatus">第二關只測「已登入，但提醒資料不合法」是否會被正式 Worker 擋下；不會建立真正提醒。</div><button class="action" id="reminderInvalidTestBtn">🛡️ 測試錯誤提醒資料</button></div>`;
+  document.querySelector('#main').innerHTML=`<div class="panel"><h2>🔔 提醒</h2><div class="small">Push 收件地址測試版：第一關本機門鈴已成功。現在只確認這台 iPhone 能否建立真正的 Web Push subscription。這一步仍不建立 Reminder、不寫 Firestore，也不會動 Memory / Item。</div></div><div class="panel"><h2>通知權限</h2><div class="small">目前：${esc(label)}</div><button class="action" id="notificationTestBtn" ${supported?'':'disabled'}>🔔 再測一次本機通知</button></div><div class="panel"><h2>📮 Push 收件地址</h2><div class="small" id="pushSubscriptionStatus">尚未檢查這台裝置的 Push subscription。</div><button class="action" id="pushSubscriptionBtn" ${supported?'':'disabled'}>📮 建立 Push 收件地址</button><div class="small" style="margin-top:8px">成功後只確認 subscription 已建立；這一版不顯示 endpoint 或金鑰，也不會上傳到 Firestore / Cloudflare。</div></div><div class="panel"><h2>🧪 Reminder API 門禁測試</h2><div class="small" id="reminderApiTestStatus">第二關只測「已登入，但提醒資料不合法」是否會被正式 Worker 擋下；不會建立真正提醒。</div><button class="action" id="reminderInvalidTestBtn">🛡️ 測試錯誤提醒資料</button><div class="small" style="margin-top:16px" id="reminderValidTestStatus">第三關：建立一筆約 10 分鐘後的合法測試提醒，確認正式 D1 會使用目前登入者的 Firebase UID。</div><button class="action" id="reminderValidTestBtn">📮 建立合法測試提醒</button></div>`;
   const a=document.getElementById('notificationTestBtn'); if(a)a.onclick=testLocalNotification;
   const b=document.getElementById('pushSubscriptionBtn'); if(b)b.onclick=createPushSubscriptionTest;
   const c=document.getElementById('reminderInvalidTestBtn'); if(c)c.onclick=testInvalidReminderCreate;
+  const d=document.getElementById('reminderValidTestBtn'); if(d)d.onclick=testValidReminderCreate;
 }
+async function testValidReminderCreate(){
+  const el=document.getElementById('reminderValidTestStatus'),btn=document.getElementById('reminderValidTestBtn');
+  if(!el||!btn)return;
+  if(!user){el.textContent='❌ 請先到「我的」登入 Google 帳號。';return}
+  btn.disabled=true;
+  el.textContent='正在建立約 10 分鐘後的合法測試提醒……';
+  try{
+    const token=await user.getIdToken();
+    const reminderId=crypto.randomUUID();
+    const scheduledAt=Math.floor(Date.now()/1000)+(10*60);
+    const title='V0.8 Reminder API 合法建立測試';
+    const res=await fetch(BUTLER_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+      body:JSON.stringify({
+        mode:'reminder-create',
+        reminderId,
+        title,
+        scheduledAt
+      })
+    });
+    let data={};
+    try{data=await res.json()}catch(_){}
+    if(res.status===200 && data?.ok===true && data?.saved===true && data?.reminderId===reminderId){
+      el.textContent=`✅ API 建立成功。提醒編號：${reminderId}｜接著請到 D1 驗證 uid、status 與時間。`;
+    }else{
+      el.textContent=`❌ 結果不符合預期：HTTP ${res.status}｜${data?.error||'沒有錯誤訊息'}`;
+    }
+  }catch(e){
+    el.textContent='❌ 測試失敗：'+String(e?.message||e);
+  }finally{
+    btn.disabled=false;
+  }
+}
+
 async function testInvalidReminderCreate(){
   const el=document.getElementById('reminderApiTestStatus'),btn=document.getElementById('reminderInvalidTestBtn');
   if(!el||!btn)return;
