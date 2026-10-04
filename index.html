@@ -239,24 +239,18 @@ async function loadRelatedCardsReadOnly(candidates){
   const result=[];
   if(!user || !Array.isArray(candidates) || candidates.length===0) return result;
 
-  // relatedCards 階段只讀 Firestore，不寫 Memory / Item。
-  // 為避免現在就建立複合索引，先讀取個人小型集合，再由前端做確定性篩選。
-  let memoryDocs=[];
-  let itemDocs=[];
+  // relatedCards 階段只讀 D1/API，不寫 Memory / Item。
+  const token=await user.getIdToken();
+  const res=await fetch(BUTLER_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+    body:JSON.stringify({mode:'memory-read-test'})
+  });
+  const data=await res.json();
+  if(!res.ok || !data?.ok) throw new Error(data?.error || `relatedCards HTTP ${res.status}`);
 
-  try{
-    const ms=await cloud.collection('users').doc(user.uid).collection('memories').get();
-    memoryDocs=ms.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){
-    memoryDocs=[];
-  }
-
-  try{
-    const is=await cloud.collection('users').doc(user.uid).collection('items').get();
-    itemDocs=is.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){
-    itemDocs=[];
-  }
+  const memoryDocs=Array.isArray(data.memories)?data.memories:[];
+  const itemDocs=Array.isArray(data.items)?data.items:[];
 
   for(let i=0;i<candidates.length;i++){
     const c=candidates[i];
@@ -909,25 +903,31 @@ function compactRecallCard(id,targetType,data){
 
 async function loadRecallPoolReadOnly(currentUserMessage){
   if(!user) return [];
-  const base=cloud.collection("users").doc(user.uid);
-  const [memorySnap,itemSnap]=await Promise.all([
-    base.collection("memories").get(),
-    base.collection("items").get()
-  ]);
 
+  const token=await user.getIdToken();
+  const res=await fetch(BUTLER_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+    body:JSON.stringify({mode:'memory-read-test'})
+  });
+  const data=await res.json();
+  if(!res.ok || !data?.ok) throw new Error(data?.error || `Recall pool HTTP ${res.status}`);
+
+  const memoryDocs=Array.isArray(data.memories)?data.memories:[];
+  const itemDocs=Array.isArray(data.items)?data.items:[];
   const cards=[];
-  memorySnap.forEach(doc=>{
-    const data=doc.data()||{};
-    if(!isRecallEligibleV1Card("memory",data)) return;
-    const card=compactRecallCard(doc.id,"memory",data);
+
+  for(const row of memoryDocs){
+    if(!isRecallEligibleV1Card("memory",row)) continue;
+    const card=compactRecallCard(row.id,"memory",row);
     if(card.sensitivity!=="sensitive" || sensitiveLikelyRelevant(currentUserMessage,card)) cards.push(card);
-  });
-  itemSnap.forEach(doc=>{
-    const data=doc.data()||{};
-    if(!isRecallEligibleV1Card("item",data)) return;
-    const card=compactRecallCard(doc.id,"item",data);
+  }
+
+  for(const row of itemDocs){
+    if(!isRecallEligibleV1Card("item",row)) continue;
+    const card=compactRecallCard(row.id,"item",row);
     if(card.sensitivity!=="sensitive" || sensitiveLikelyRelevant(currentUserMessage,card)) cards.push(card);
-  });
+  }
   return cards;
 }
 
