@@ -849,8 +849,12 @@ function isRecallEligibleV1Card(targetType,data){
 
   const sensitivityOk=["normal","sensitive"].includes(String(data.sensitivity||""));
   const evidenceTypeOk=["explicit","derived"].includes(String(data.evidenceType||""));
-  const sourceIdsOk=Array.isArray(data.sourceMessageIds) && data.sourceMessageIds.length>0 &&
-    data.sourceMessageIds.every(x=>typeof x==="string" && x.trim());
+  let sourceIds=data.sourceMessageIds;
+  if(typeof sourceIds==="string"){
+    try{sourceIds=JSON.parse(sourceIds)}catch(_){sourceIds=[]}
+  }
+  const sourceIdsOk=Array.isArray(sourceIds) && sourceIds.length>0 &&
+    sourceIds.every(x=>typeof x==="string" && x.trim());
   const evidenceSummaryOk=typeof data.evidenceSummary==="string" && data.evidenceSummary.trim().length>0;
   const createdAtOk=isStoredTimestamp(data.createdAt);
   const updatedAtOk=isStoredTimestamp(data.updatedAt);
