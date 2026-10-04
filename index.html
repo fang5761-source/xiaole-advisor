@@ -69,41 +69,44 @@ function formatCloudTime(value){
 async function renderMemory(){
   const main=document.querySelector("#main");
   if(!user){
-    main.innerHTML='<div class="panel"><h2>📚 回憶</h2><div class="small">請先到「我的」登入 Google 帳號，才能讀取 Firestore 裡的小樂記憶與事項。</div></div>';
+    main.innerHTML='<div class="panel"><h2>📚 回憶</h2><div class="small">請先到「我的」登入 Google 帳號，才能讀取小樂記憶與事項。</div></div>';
     return;
   }
   main.innerHTML='<div class="panel"><h2>📚 回憶</h2><div class="small">正在打開回憶櫃……</div></div>';
   try{
-    const base=cloud.collection("users").doc(user.uid);
-    const [memorySnap,itemSnap]=await Promise.all([
-      base.collection("memories").get(),
-      base.collection("items").get()
-    ]);
-    const stamp=x=>x?.updatedAt&&typeof x.updatedAt.toMillis==="function"?x.updatedAt.toMillis():0;
-    const memories=memorySnap.docs.map(d=>({id:d.id,...d.data()}))
-      .filter(x=>x.testOnly!==true).sort((a,b)=>stamp(b)-stamp(a));
+    const token=await user.getIdToken();
+    const res=await fetch(BUTLER_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+      body:JSON.stringify({mode:'memory-read-test'})
+    });
+    const data=await res.json();
+    if(!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+
+    const stamp=x=>Number(x?.updatedAt)||0;
+    const memories=Array.isArray(data.memories)?[...data.memories].sort((a,b)=>stamp(b)-stamp(a)):[];
     const rank={ongoing:0,paused:1,completed:2,abandoned:3};
-    const items=itemSnap.docs.map(d=>({id:d.id,...d.data()}))
-      .filter(x=>x.testOnly!==true).sort((a,b)=>(rank[a.state]??9)-(rank[b.state]??9)||stamp(b)-stamp(a));
+    const items=Array.isArray(data.items)?[...data.items].sort((a,b)=>(rank[a.state]??9)-(rank[b.state]??9)||stamp(b)-stamp(a)):[];
 
     const memoryHtml=memories.length?memories.map(x=>{
-      const status=x.status==="retired"?"已退休":"使用中", when=formatCloudTime(x.updatedAt);
+      const status=x.status==="retired"?"已退休":"使用中", when=formatCloudTime(x.updatedAt?x.updatedAt*1000:null);
       return `<div class="result"><b>${esc(x.content||"")}</b><br><span class="small">${esc(x.category||"未分類")} · ${esc(status)}${when?` · 更新 ${esc(when)}`:""}</span></div>`;
     }).join(""):'<div class="small">目前沒有正式 Memory。</div>';
 
     const stateLabel={ongoing:"進行中",paused:"暫停",completed:"已完成",abandoned:"已放棄"};
     const itemHtml=items.length?items.map(x=>{
-      const when=formatCloudTime(x.updatedAt);
+      const when=formatCloudTime(x.updatedAt?x.updatedAt*1000:null);
       return `<div class="result"><b>${esc(x.title||"未命名事項")}</b><br><span class="small">${esc(stateLabel[x.state]||x.state||"")}${when?` · 更新 ${esc(when)}`:""}</span>${x.progress?`<br><span class="small">${esc(x.progress)}</span>`:""}</div>`;
     }).join(""):'<div class="small">目前沒有正式 Item。</div>';
 
-    main.innerHTML=`<div class="panel"><h2>📚 回憶櫃</h2><div class="small">直接讀取 Firestore 既有 Memory / Item；這裡只看，不新增、不修改、不刪除。</div></div>
+    main.innerHTML=`<div class="panel"><h2>📚 回憶櫃</h2><div class="small">直接讀取 D1 既有 Memory / Item；這裡只看，不新增、不修改、不刪除。</div></div>
     <div class="panel"><h2>🧠 記憶 Memory</h2><div class="small">共 ${memories.length} 張正式記憶卡。</div>${memoryHtml}</div>
     <div class="panel"><h2>🔖 事情 Item</h2><div class="small">共 ${items.length} 張事項卡；進行中、暫停、已完成與已放棄都保留可見。</div>${itemHtml}</div>`;
   }catch(e){
     main.innerHTML=`<div class="panel"><h2>📚 回憶</h2><div class="small">❌ 讀取失敗：${esc(e?.message||e)}</div></div>`;
   }
 }
+
 function urlBase64ToUint8Array(s){
   const p='='.repeat((4-s.length%4)%4), b=(s+p).replace(/-/g,'+').replace(/_/g,'/');
   const raw=atob(b); return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
