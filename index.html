@@ -1084,6 +1084,57 @@ function removeThinking(){
   if(window.xiaoleThinkingTimer){clearInterval(window.xiaoleThinkingTimer);window.xiaoleThinkingTimer=null;}
   document.getElementById('thinkingBubble')?.remove();
 }
+// V1 入住接線候選：正式聊天產生的 Candidate 改送 V7.17 D1 Live Router。
+// 目前正式環境 Write Power 維持 OFF；HTTP 423 + FORMAL_WRITE_POWER_OFF_NO_D1_MUTATION
+// 視為「已抵達正確 Executor、被總電源安全擋住」的預期驗收結果，不當成聊天失敗。
+async function routeCandidatesToFormalD1PowerOff(message,candidates,messageId,idToken){
+  const results=[];
+  for(let i=0;i<(candidates||[]).length;i++){
+    const candidate=candidates[i];
+    try{
+      const res=await fetch(BUTLER_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${idToken}`},
+        body:JSON.stringify({
+          mode:'formal-orchestration-live-router-v1',
+          candidate,
+          candidateIndex:i,
+          message,
+          messageId
+        })
+      });
+      let data=null;
+      try{ data=await res.json(); }catch(_){ data=null; }
+
+      const safelyBlockedByPowerOff=
+        res.status===423 &&
+        data?.databaseWrite===false &&
+        data?.powerEnabled===false &&
+        data?.safety==='FORMAL_WRITE_POWER_OFF_NO_D1_MUTATION';
+
+      const safeNoMutation=
+        res.ok &&
+        data?.databaseWrite===false &&
+        data?.liveRoute===null &&
+        ['LIVE_ROUTER_NO_MUTATION_ACTION','LIVE_ROUTER_NO_MUTATING_ACTION'].includes(data?.safety);
+
+      if(safelyBlockedByPowerOff){
+        results.push({candidateIndex:i,candidateType:candidate?.targetType||'',status:'POWER_OFF_BLOCKED_AS_EXPECTED',httpStatus:res.status,mode:data?.mode||null,databaseWrite:false,safety:data?.safety||null});
+      }else if(safeNoMutation){
+        results.push({candidateIndex:i,candidateType:candidate?.targetType||'',status:'NO_MUTATION_AS_EXPECTED',httpStatus:res.status,mode:data?.mode||null,databaseWrite:false,safety:data?.safety||null});
+      }else if(res.ok && data?.ok){
+        // Write Power 理論上目前是 OFF；若意外真的寫入，立即把異常留下來供驗收，不能靜默當成功。
+        results.push({candidateIndex:i,candidateType:candidate?.targetType||'',status:data?.databaseWrite===true?'UNEXPECTED_DATABASE_WRITE':'ROUTER_OK',httpStatus:res.status,mode:data?.mode||null,databaseWrite:data?.databaseWrite===true,safety:data?.safety||null});
+      }else{
+        results.push({candidateIndex:i,candidateType:candidate?.targetType||'',status:'ROUTER_ERROR',httpStatus:res.status,error:data?.error||`HTTP ${res.status}`,databaseWrite:data?.databaseWrite===true,safety:data?.safety||null});
+      }
+    }catch(e){
+      results.push({candidateIndex:i,candidateType:candidate?.targetType||'',status:'ROUTER_ERROR',error:String(e?.message||e),databaseWrite:false});
+    }
+  }
+  return {messageId,results};
+}
+
 async function sendMsg(){
   let v=input.value.trim();
   if(!v)return;
@@ -1152,41 +1203,20 @@ async function sendMsg(){
       messageId:userMessage.cloudId,
       candidates:Array.isArray(data.candidates)?data.candidates:[]
     };
-    lastRelatedCardsObservation={
-      messageId:userMessage.cloudId,
-      groups:await loadRelatedCardsReadOnly(lastCandidateObservation.candidates)
-    };
-    lastJudgeObservation=await buildJudgeObservation(
-      userMessage.cloudId,
+    // V1 入住接線候選：舊 Firestore Memory/Item Writer 不再由正式聊天呼叫。
+    // Candidate 直接交給 V7.17 後端 Orchestration；Write Power 目前維持 OFF。
+    const formalD1RoutingObservation=await routeCandidatesToFormalD1PowerOff(
+      v,
       lastCandidateObservation.candidates,
-      lastRelatedCardsObservation.groups
-    );
-    lastValidationObservation=buildValidationObservation(
       userMessage.cloudId,
-      lastCandidateObservation.candidates,
-      lastRelatedCardsObservation.groups,
-      lastJudgeObservation
+      idToken
     );
-    lastWriteObservation=await executeCreateWrites(
-      userMessage.cloudId,
-      lastCandidateObservation.candidates,
-      lastJudgeObservation,
-      lastValidationObservation
-    );
-    lastUpdateObservation=await executeUpdateWrites(
-      userMessage.cloudId,
-      lastCandidateObservation.candidates,
-      lastRelatedCardsObservation,
-      lastJudgeObservation,
-      lastValidationObservation
-    );
-    lastRetireObservation=await executeRetireWrites(
-      userMessage.cloudId,
-      lastCandidateObservation.candidates,
-      lastRelatedCardsObservation,
-      lastJudgeObservation,
-      lastValidationObservation
-    );
+    lastRelatedCardsObservation={messageId:userMessage.cloudId,groups:[],source:'V7.17_BACKEND_ORCHESTRATION'};
+    lastJudgeObservation={messageId:userMessage.cloudId,decisions:[],source:'V7.17_BACKEND_ORCHESTRATION'};
+    lastValidationObservation={messageId:userMessage.cloudId,results:[],source:'V7.17_BACKEND_ORCHESTRATION'};
+    lastWriteObservation=formalD1RoutingObservation;
+    lastUpdateObservation={messageId:userMessage.cloudId,results:[],source:'V7.17_BACKEND_ORCHESTRATION'};
+    lastRetireObservation={messageId:userMessage.cloudId,results:[],source:'V7.17_BACKEND_ORCHESTRATION'};
 
     const reply=String(data.reply||'').trim();
     if(!reply) throw new Error('小樂有收到訊息，但沒有取得回答文字。');
