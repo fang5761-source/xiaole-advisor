@@ -106,7 +106,68 @@ function urlBase64ToUint8Array(s){
   const raw=atob(b); return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
 }
 function renderReminder(){
-  document.querySelector('#main').innerHTML=`<div class="panel"><h2>🔔 提醒</h2><div class="small">提醒功能的底層管線已保留。正式提醒介面會在後續入住階段接上；施工測試按鈕已從日常畫面移除。</div></div>`;
+  const main=document.querySelector('#main');
+  if(!user){
+    main.innerHTML='<div class="panel"><h2>🔔 提醒</h2><div class="small">請先到「我的」登入 Google 帳號，才能建立提醒。</div></div>';
+    return;
+  }
+
+  const now=new Date();
+  now.setMinutes(now.getMinutes()-now.getTimezoneOffset()+10);
+  const defaultTime=now.toISOString().slice(0,16);
+
+  main.innerHTML=`<div class="panel">
+    <h2>🔔 新增提醒</h2>
+    <div class="small">把要提醒的事情和時間填好，小樂會替妳記住。</div>
+    <input class="search" id="reminderTitle" type="text" maxlength="120" placeholder="例如：記得帶健保卡" style="margin-top:12px">
+    <input class="search" id="reminderTime" type="datetime-local" value="${esc(defaultTime)}" style="margin-top:10px">
+    <button class="action" id="reminderCreateBtn" style="margin-top:10px">🔔 建立提醒</button>
+    <div class="small" id="reminderCreateStatus" style="margin-top:8px"></div>
+  </div>`;
+  document.getElementById('reminderCreateBtn').onclick=createFormalReminder;
+}
+
+async function createFormalReminder(){
+  const titleEl=document.getElementById('reminderTitle');
+  const timeEl=document.getElementById('reminderTime');
+  const statusEl=document.getElementById('reminderCreateStatus');
+  const btn=document.getElementById('reminderCreateBtn');
+  if(!titleEl||!timeEl||!statusEl||!btn)return;
+
+  const title=titleEl.value.trim();
+  const when=new Date(timeEl.value);
+  if(!title){statusEl.textContent='請先寫下要提醒的事情。';titleEl.focus();return}
+  if(!timeEl.value||!Number.isFinite(when.getTime())){statusEl.textContent='請選擇提醒時間。';timeEl.focus();return}
+  if(when.getTime()<=Date.now()){statusEl.textContent='提醒時間要晚於現在喔。';timeEl.focus();return}
+  if(!user){statusEl.textContent='請先到「我的」登入 Google 帳號。';return}
+
+  btn.disabled=true;
+  statusEl.textContent='正在替妳建立提醒……';
+  try{
+    const token=await user.getIdToken();
+    const reminderId=crypto.randomUUID();
+    const scheduledAt=Math.floor(when.getTime()/1000);
+    const res=await fetch(BUTLER_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+      body:JSON.stringify({mode:'reminder-create',reminderId,title,scheduledAt})
+    });
+    let data={};
+    try{data=await res.json()}catch(_){}
+    if(!res.ok||data?.ok!==true||data?.saved!==true){
+      throw new Error(data?.error||`HTTP ${res.status}`);
+    }
+    const shown=new Intl.DateTimeFormat('zh-TW',{
+      year:'numeric',month:'numeric',day:'numeric',
+      hour:'2-digit',minute:'2-digit'
+    }).format(when);
+    statusEl.textContent=`✅ 已建立：${title}｜${shown}`;
+    titleEl.value='';
+  }catch(e){
+    statusEl.textContent='❌ 提醒沒有建立成功：'+String(e?.message||e);
+  }finally{
+    btn.disabled=false;
+  }
 }
 
 async function testValidReminderCreate(){
