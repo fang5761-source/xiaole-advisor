@@ -106,15 +106,9 @@ function urlBase64ToUint8Array(s){
   const raw=atob(b); return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
 }
 function renderReminder(){
-  const supported=('serviceWorker' in navigator)&&('Notification' in window)&&('PushManager' in window);
-  const permission=('Notification' in window)?Notification.permission:'unsupported';
-  const label=permission==='granted'?'已允許':permission==='denied'?'已拒絕':permission==='default'?'尚未詢問':'不支援';
-  document.querySelector('#main').innerHTML=`<div class="panel"><h2>🔔 提醒</h2><div class="small">Push 收件地址測試版：第一關本機門鈴已成功。現在只確認這台 iPhone 能否建立真正的 Web Push subscription。這一步仍不建立 Reminder、不寫 Firestore，也不會動 Memory / Item。</div></div><div class="panel"><h2>通知權限</h2><div class="small">目前：${esc(label)}</div><button class="action" id="notificationTestBtn" ${supported?'':'disabled'}>🔔 再測一次本機通知</button></div><div class="panel"><h2>📮 Push 收件地址</h2><div class="small" id="pushSubscriptionStatus">尚未檢查這台裝置的 Push subscription。</div><button class="action" id="pushSubscriptionBtn" ${supported?'':'disabled'}>📮 建立 Push 收件地址</button><div class="small" style="margin-top:8px">成功後只確認 subscription 已建立；這一版不顯示 endpoint 或金鑰，也不會上傳到 Firestore / Cloudflare。</div></div><div class="panel"><h2>🧪 Reminder API 門禁測試</h2><div class="small" id="reminderApiTestStatus">第二關只測「已登入，但提醒資料不合法」是否會被正式 Worker 擋下；不會建立真正提醒。</div><button class="action" id="reminderInvalidTestBtn">🛡️ 測試錯誤提醒資料</button><div class="small" style="margin-top:16px" id="reminderValidTestStatus">第三關：建立一筆約 10 分鐘後的合法測試提醒，確認正式 D1 會使用目前登入者的 Firebase UID。</div><button class="action" id="reminderValidTestBtn">📮 建立合法測試提醒</button></div>`;
-  const a=document.getElementById('notificationTestBtn'); if(a)a.onclick=testLocalNotification;
-  const b=document.getElementById('pushSubscriptionBtn'); if(b)b.onclick=createPushSubscriptionTest;
-  const c=document.getElementById('reminderInvalidTestBtn'); if(c)c.onclick=testInvalidReminderCreate;
-  const d=document.getElementById('reminderValidTestBtn'); if(d)d.onclick=testValidReminderCreate;
+  document.querySelector('#main').innerHTML=`<div class="panel"><h2>🔔 提醒</h2><div class="small">提醒功能的底層管線已保留。正式提醒介面會在後續入住階段接上；施工測試按鈕已從日常畫面移除。</div></div>`;
 }
+
 async function testValidReminderCreate(){
   const el=document.getElementById('reminderValidTestStatus'),btn=document.getElementById('reminderValidTestBtn');
   if(!el||!btn)return;
@@ -394,10 +388,17 @@ async function runRecallReadOnly(currentUserMessage,idToken){
   };
 }
 
-function renderMe(){const who=user?`<b>${esc(user.displayName||'已登入')}</b><br>${esc(user.email||'')}`:'尚未登入 Google 帳號';document.querySelector('#main').innerHTML=`<div class="panel"><h2>Google 帳號</h2><div class="small">${who}</div>${user?'<button class="action" id="syncBtn">☁️ 立即同步</button><button class="action" id="logoutBtn">登出 Google</button>':'<button class="action" id="loginBtn">G　使用 Google 帳號登入</button>'}</div><div class="panel"><h2>🌱 小樂管家</h2><div class="small" id="butlerStatus">尚未測試後端連線。</div><button class="action" id="butlerBtn">🤝 握手測試</button></div><div class="panel"><h2>📚 Recall 唯讀觀察</h2><div class="small">${lastRecallObservation?`上一則訊息：${esc(lastRecallObservation.messageId)} · 候選池 ${lastRecallObservation.poolCount} 張 · 選中 ${lastRecallObservation.selectedCards.length} 張`:'尚未執行 Recall。'}</div><div>${lastRecallObservation?`<div class="result"><b>${lastRecallObservation.recall?.shouldRecall?'✅ 應該回想':'⭕ 不需要回想'}</b><br><span class="small">${esc(lastRecallObservation.recall?.reason||'')}</span></div>${lastRecallObservation.selectedCards.length?lastRecallObservation.selectedCards.map((x,i)=>`<div class="result"><b>Recall ${i+1} · ${esc(x.targetType||'')} · ${esc(x.id||'')}</b><br><span class="small">${esc(JSON.stringify(x,null,2))}</span></div>`).join(''):'<div class="small">沒有選中任何 Memory / Item。</div>'}`:''}</div><div class="small" style="margin-top:8px">唯讀：Recall 只挑出回答目前問題可能需要的既有卡片；不新增、不更新、不退休任何 Memory / Item。選中的卡片會提供給正常回答作為參考；敏感卡片只有本機初步判斷可能相關時才進入 Recall 候選池。</div></div><div class="panel"><h2>✏️ Candidate 唯讀觀察</h2><div class="small" id="candidateStatus">${lastCandidateObservation?`上一則訊息：${esc(lastCandidateObservation.messageId)} · ${lastCandidateObservation.candidates.length} 個 Candidate`:'尚未收到 Candidate 測試結果。'}</div><div id="candidateResults">${lastCandidateObservation?(lastCandidateObservation.candidates.length?lastCandidateObservation.candidates.map((x,i)=>`<div class="result"><b>Candidate ${i+1} · ${esc(x.targetType||'')}</b><br><span class="small">${esc(JSON.stringify(x,null,2))}</span></div>`).join(''):'<div class="small">✅ candidates = []（這一則沒有值得提名的長期記憶）</div>'):''}</div><div class="small" style="margin-top:8px">唯讀：這裡只顯示 AI 提名，不會自動寫入 Memory 或 Item。</div></div><div class="panel"><h2>資料保險</h2><div class="small">本機資料仍保留；登入後另同步一份到 Firestore。匯出包可再留一份在自己手上。</div><button class="action" id="exportBtn">📦 匯出文字備份</button><button class="action" id="clearBtn">清除本機測試資料</button></div>`;
-if(user){syncBtn.onclick=syncNow;logoutBtn.onclick=()=>auth.signOut()}else loginBtn.onclick=loginGoogle;butlerBtn.onclick=testButler;exportBtn.onclick=exportData;clearBtn.onclick=async()=>{if(confirm('只清除這台裝置的本機資料？雲端資料不會刪除。')){await clearMessages();renderMe()}}}
-
-
+function renderMe(){
+  const who=user?`<b>${esc(user.displayName||'已登入')}</b><br>${esc(user.email||'')}`:'尚未登入 Google 帳號';
+  document.querySelector('#main').innerHTML=`<div class="panel"><h2>Google 帳號</h2><div class="small">${who}</div>${user?'<button class="action" id="syncBtn">☁️ 立即同步</button><button class="action" id="logoutBtn">登出 Google</button>':'<button class="action" id="loginBtn">G　使用 Google 帳號登入</button>'}</div><div class="panel"><h2>資料保險</h2><div class="small">本機資料仍保留；登入後另同步一份到 Firestore。匯出包可再留一份在自己手上。</div><button class="action" id="exportBtn">📦 匯出文字備份</button></div>`;
+  if(user){
+    document.getElementById('syncBtn').onclick=syncNow;
+    document.getElementById('logoutBtn').onclick=()=>auth.signOut();
+  }else{
+    document.getElementById('loginBtn').onclick=loginGoogle;
+  }
+  document.getElementById('exportBtn').onclick=exportData;
+}
 
 const BUTLER_URL='https://xiaole-api.wpf610.workers.dev/';
 async function testButler(){const el=document.getElementById('butlerStatus'),btn=document.getElementById('butlerBtn');if(!el||!btn)return;btn.disabled=true;el.textContent='正在敲小樂管家的門……';try{const r=await fetch(BUTLER_URL,{method:'GET',cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const t=(await r.text()).trim();el.textContent='✅ 收到回覆：'+t;}catch(e){el.textContent='❌ 握手沒有成功：'+e.message;}finally{btn.disabled=false}}
