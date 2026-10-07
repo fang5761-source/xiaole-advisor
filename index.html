@@ -51,7 +51,7 @@ const day=t=>new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'long',day:'n
 const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const makeCloudId=()=>crypto.randomUUID?crypto.randomUUID():'m-'+Date.now()+'-'+Math.random().toString(36).slice(2);
 function setStatus(s){cloudStatus.textContent=s}
-async function renderChat(){let a=(await allMessages()).sort((a,b)=>a.createdAt-b.createdAt),m=document.querySelector('#main');if(!a.length){m.innerHTML='<div class="empty">這裡會是一條一直延續下去的對話。<br>先跟小樂說第一句話吧 😆</div>';return}let last='';m.innerHTML=a.map(x=>{let d=day(x.createdAt),h=(d!==last?`<div class="day">${last=d}</div>`:'');return h+`<div class="bubble ${x.role==='user'?'me':'xiaole'}">${esc(x.text)}<div class="time">${fmt(x.createdAt)}${x.synced?' · ☁️':''}</div></div>`}).join('');scrollTo(0,document.body.scrollHeight)}
+async function renderChat(){let a=(await allMessages()).sort((a,b)=>a.createdAt-b.createdAt),m=document.querySelector('#main');if(!a.length){m.innerHTML='<div class="empty">這裡會是一條一直延續下去的對話。<br>先跟小樂說第一句話吧 😆</div>';return}let last='';m.innerHTML=a.map(x=>{let d=day(x.createdAt),h=(d!==last?`<div class="day">${last=d}</div>`:'');return h+`<div class="bubble ${x.role==='user'?'me':'xiaole'}">${esc(x.text)}<div class="time">${fmt(x.createdAt)}${x.synced?' · ☁️':''}</div></div>`}).join('')}
 function formatCloudTime(value){
   try{
     const ms=Number.isFinite(value)?value:(value&&typeof value.toMillis==="function"?value.toMillis():null);
@@ -491,7 +491,7 @@ function showThinking(){
     n=n%3+1;
     d.textContent='.'.repeat(n);
   },450);
-  scrollTo(0,document.body.scrollHeight);
+  el.scrollIntoView({block:'nearest'});
 }
 function removeThinking(){
   if(window.xiaoleThinkingTimer){clearInterval(window.xiaoleThinkingTimer);window.xiaoleThinkingTimer=null;}
@@ -645,7 +645,7 @@ async function sendMsg(){
   }
 }
 send.onclick=sendMsg;input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}};plus.onclick=()=>alert('圖片／網址入口後續版本加入。');
-document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===b));composer.style.display=tab==='chat'?'block':'none';({chat:renderChat,memory:renderMemory,reminder:renderReminder,me:renderMe}[tab])()});
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=async()=>{tab=b.dataset.tab;document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===b));composer.style.display=tab==='chat'?'block':'none';await ({chat:renderChat,memory:renderMemory,reminder:renderReminder,me:renderMe}[tab])();window.scrollTo({top:0,left:0,behavior:'auto'});});
 auth.onAuthStateChanged(async u=>{user=u||null;if(user){setStatus('↻ 同步中');await syncNow()}else setStatus('● 本機');if(tab==='me')renderMe()});
 openDB().then(()=>renderChat()).catch(e=>{setStatus('● 本機');alert('本機資料庫開啟失敗：'+e.message)});
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=0.8-push-upload2').catch(()=>{});
